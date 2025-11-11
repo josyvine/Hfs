@@ -21,7 +21,7 @@ android {
     }
 
     compileOptions {
-        // --- CHANGE 1: Downgraded to Java 8 for jlibtorrent 1.x compatibility ---
+        // Using Java 8 is compatible with both libtorrent4j 1.x and 2.x.
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -67,7 +67,7 @@ dependencies {
     // Hidden dependencies of Fragment/Biometric
     implementation 'androidx.activity:activity:1.8.2'
     implementation 'androidx.savedstate:savedstate:1.2.1'
-    
+
     // Archive handling libraries
     implementation 'net.lingala.zip4j:zip4j:2.11.5'
     implementation 'com.github.junrar:junrar:7.5.5'
@@ -82,9 +82,15 @@ dependencies {
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
 
-    // TORRENT CLIENT - Official libtorrent4j from Maven Central (core Java + ARM64 natives)
-    // --- CHANGE 2: Set to the version that matches your code's API ---
-    def libtorrentVersion = "1.2.0.19"
+    // --- START OF CORRECTION ---
+    // TORRENT CLIENT - Using a modern version of org.libtorrent4j from Maven Central.
+    // This version's API matches the code in TorrentManager.java.
+    def libtorrentVersion = "2.1.2.0"
     implementation "org.libtorrent4j:libtorrent4j:$libtorrentVersion"
+    // Including native libraries for all common Android architectures.
     implementation "org.libtorrent4j:libtorrent4j-android-arm64:$libtorrentVersion"
+    implementation "org.libtorrent4j:libtorrent4j-android-arm:$libtorrentVersion"
+    implementation "org.libtorrent4j:libtorrent4j-android-x86:$libtorrentVersion"
+    implementation "org.libtorrent4j:libtorrent4j-android-x86_64:$libtorrentVersion"
+    // --- END OF CORRECTION ---
 }
