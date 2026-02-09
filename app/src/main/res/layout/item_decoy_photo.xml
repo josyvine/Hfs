@@ -20,7 +20,7 @@
             android:id="@+id/ivDecoyImage"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:background="@android:color/lighter_gray"
+            android:background="@color/gray_text"
             android:contentDescription="Decoy Photo"
             android:scaleType="centerCrop"
             app:layout_constraintBottom_toBottomOf="parent"
