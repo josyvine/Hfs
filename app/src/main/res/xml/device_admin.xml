@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <!-- Required to Lock the screen remotely via SMS -->
+        <force-lock />
+        
+        <!-- Required to monitor failed unlock attempts (Intruder detection) -->
+        <watch-login />
+        
+        <!-- Required to prevent uninstallation (User must deactivate admin first) -->
+        <limit-password />
+        
+        <!-- Optional: Encrypt storage for intruder logs -->
+        <encrypted-storage />
+    </uses-policies>
+</device-admin>
