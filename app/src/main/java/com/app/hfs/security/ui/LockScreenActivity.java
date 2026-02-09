@@ -9,6 +9,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.biometric.BiometricPrompt;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
@@ -24,15 +25,16 @@ import com.hfs.security.utils.HFSDatabaseHelper;
 import com.hfs.security.utils.SmsHelper;
 
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
  * The Security Overlay Activity.
  * This activity launches whenever a protected app is opened.
- * 1. It runs a 1x1 pixel invisible camera preview.
- * 2. It analyzes the front camera frames for face recognition.
- * 3. It either closes (Success) or blocks the user (Mismatch).
+ * 1. Runs 1x1 invisible camera for Face Match.
+ * 2. Provides Fingerprint (Biometric) Unlock fallback.
+ * 3. Provides PIN Unlock fallback.
  */
 public class LockScreenActivity extends AppCompatActivity {
 
@@ -43,11 +45,16 @@ public class LockScreenActivity extends AppCompatActivity {
     private boolean isProcessing = false;
     private boolean isLocked = false;
 
+    // Biometric Authentication Variables
+    private Executor biometricExecutor;
+    private BiometricPrompt biometricPrompt;
+    private BiometricPrompt.PromptInfo promptInfo;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Set window flags to appear over other apps and the system lock screen
+        // Keep overlay on top of everything
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                 | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
                 | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -60,20 +67,51 @@ public class LockScreenActivity extends AppCompatActivity {
         faceAuthHelper = new FaceAuthHelper(this);
         cameraExecutor = Executors.newSingleThreadExecutor();
 
-        // Initially hide the Lock UI (PIN/Warning) to perform silent check first
+        // Initial invisible state for background face scanning
         binding.lockContainer.setVisibility(View.GONE);
         binding.scanningIndicator.setVisibility(View.VISIBLE);
 
-        // Start the invisible camera preview
+        // Initialize Biometric Prompt
+        setupFingerprintScanner();
+
+        // Start the silent camera verification
         startInvisibleCamera();
 
-        // Setup PIN Button for manual bypass (Phase 9 backup)
+        // UI Listeners
         binding.btnUnlockPin.setOnClickListener(v -> verifyBackupPin());
+        binding.btnFingerprint.setOnClickListener(v -> biometricPrompt.authenticate(promptInfo));
     }
 
-    /**
-     * Initializes CameraX to capture the intruder's face silently.
-     */
+    private void setupFingerprintScanner() {
+        biometricExecutor = ContextCompat.getMainExecutor(this);
+        biometricPrompt = new BiometricPrompt(LockScreenActivity.this,
+                biometricExecutor, new BiometricPrompt.AuthenticationCallback() {
+            @Override
+            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                super.onAuthenticationError(errorCode, errString);
+            }
+
+            @Override
+            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                super.onAuthenticationSucceeded(result);
+                // SUCCESS: Fingerprint matched system owner
+                finish();
+            }
+
+            @Override
+            public void onAuthenticationFailed() {
+                super.onAuthenticationFailed();
+                Toast.makeText(LockScreenActivity.this, "Fingerprint not recognized", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("HFS Security Verification")
+                .setSubtitle("Use fingerprint to unlock app")
+                .setNegativeButtonText("Use PIN")
+                .build();
+    }
+
     private void startInvisibleCamera() {
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture = 
                 ProcessCameraProvider.getInstance(this);
@@ -81,21 +119,16 @@ public class LockScreenActivity extends AppCompatActivity {
         cameraProviderFuture.addListener(() -> {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-
-                // 1. Preview (1x1 pixel - invisible to user)
                 Preview preview = new Preview.Builder().build();
                 preview.setSurfaceProvider(binding.invisiblePreview.getSurfaceProvider());
 
-                // 2. Image Analysis (For Face Recognition)
                 ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build();
 
                 imageAnalysis.setAnalyzer(cameraExecutor, this::analyzeFaceFrame);
 
-                // Use Front Camera for intruder detection
                 CameraSelector cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA;
-
                 cameraProvider.unbindAll();
                 cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis);
 
@@ -105,9 +138,6 @@ public class LockScreenActivity extends AppCompatActivity {
         }, ContextCompat.getMainExecutor(this));
     }
 
-    /**
-     * Processes each frame from the front camera to identify the user.
-     */
     private void analyzeFaceFrame(@NonNull ImageProxy imageProxy) {
         if (isProcessing || isLocked) {
             imageProxy.close();
@@ -115,17 +145,14 @@ public class LockScreenActivity extends AppCompatActivity {
         }
 
         isProcessing = true;
-
         faceAuthHelper.authenticate(imageProxy, new FaceAuthHelper.AuthCallback() {
             @Override
             public void onMatchFound() {
-                // SUCCESS: Owner identified. Close overlay and allow app access.
                 runOnUiThread(() -> finish());
             }
 
             @Override
             public void onMismatchFound() {
-                // FAILURE: Unknown person detected. Trigger security actions.
                 handleIntrusionDetection(imageProxy);
             }
 
@@ -137,26 +164,20 @@ public class LockScreenActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * Executes Phase 3/4: Lock UI, Save Evidence, and Send Alert SMS.
-     */
     private void handleIntrusionDetection(ImageProxy imageProxy) {
         if (isLocked) return;
         isLocked = true;
 
         runOnUiThread(() -> {
-            // Show the Warning and PIN prompt
             binding.scanningIndicator.setVisibility(View.GONE);
             binding.lockContainer.setVisibility(View.VISIBLE);
             
-            // Save Intruder Photo secretly
             FileSecureHelper.saveIntruderCapture(LockScreenActivity.this, imageProxy);
-
-            // Send Automatic SMS Alert to Trusted Number
             String appName = getIntent().getStringExtra("TARGET_APP_NAME");
             SmsHelper.sendAlertSms(LockScreenActivity.this, appName);
-
-            Toast.makeText(this, "⚠ Intruder Detected - App Locked", Toast.LENGTH_LONG).show();
+            
+            // Automatically trigger fingerprint prompt if available
+            biometricPrompt.authenticate(promptInfo);
         });
     }
 
@@ -178,7 +199,6 @@ public class LockScreenActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        // Prevent closing the lock screen via back button
-        // Intruder must either match face or enter PIN
+        // Back button disabled to prevent bypass
     }
 }
