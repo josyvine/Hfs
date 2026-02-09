@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/hfs_surface_dark">
+
+    <!-- HEADER FOR SMS SECTION -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Remote Access &amp; Alerts"
+        android:textColor="@color/hfs_primary_blue"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- FIELD 1: TRUSTED PHONE NUMBER -->
+    <!-- This is the number that will receive 'Intruder Captured' SMS alerts -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/layoutTrustedNumber"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Trusted Mobile Number (Alerts)"
+        android:textColorHint="@color/gray_text"
+        app:boxStrokeColor="@color/hfs_primary_blue"
+        app:startIconDrawable="@android:drawable/ic_menu_call"
+        app:startIconTint="@color/gray_text"
+        app:helperText="Receives intrusion alerts via SMS"
+        app:helperTextTextColor="@color/gray_text">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etTrustedNumber"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="phone"
+            android:textColor="@android:color/white"
+            android:textSize="16sp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- SPACER -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="20dp" />
+
+    <!-- FIELD 2: SECRET SECURITY PIN (Dialer & Command Code) -->
+    <!-- This is the custom number you dial and the code for SMS commands -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/layoutSecretPin"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Secret Security PIN / Dialer Code"
+        android:textColorHint="@color/gray_text"
+        app:boxStrokeColor="@color/hfs_primary_blue"
+        app:startIconDrawable="@android:drawable/ic_lock_idle_lock"
+        app:startIconTint="@color/gray_text"
+        app:helperText="Dial this number to open HFS if hidden"
+        app:helperTextTextColor="@color/gray_text">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etSecretPin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:maxLength="6"
+            android:textColor="@android:color/white"
+            android:textSize="16sp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- INSTRUCTIONAL TEXT -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="SMS Commands Example:\nHFS LOCK [PIN]\nHFS UNLOCK [PIN]"
+        android:textColor="@color/gray_text"
+        android:textSize="11sp"
+        android:alpha="0.7"/>
+
+    <!-- SUBMIT BUTTON -->
+    <Button
+        android:id="@+id/btnSaveSmsSettings"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:layout_marginTop="24dp"
+        android:backgroundTint="@color/hfs_primary_blue"
+        android:text="SAVE SECURITY CREDENTIALS"
+        android:textColor="@android:color/white"
+        app:cornerRadius="8dp" />
+
+</LinearLayout>
