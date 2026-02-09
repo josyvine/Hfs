@@ -9,60 +9,71 @@ import com.hfs.security.ui.SplashActivity;
 import com.hfs.security.utils.HFSDatabaseHelper;
 
 /**
- * Stealth Mode Launch Logic (Phase 8 - Oppo/ColorOS Fix).
- * This receiver intercepts outgoing calls before they are placed.
- * 
+ * Advanced Stealth Mode Receiver for Oppo/Realme (Phase 8 Fix).
  * Logic:
- * 1. User dials their CUSTOM PIN (saved in Settings) and presses the CALL button.
- * 2. This receiver catches the number.
- * 3. If the number matches the saved PIN, the call is ABORTED (canceled).
- * 4. The HFS App is launched immediately.
+ * 1. Listens for the 'ACTION_NEW_OUTGOING_CALL' event.
+ * 2. Retrieves the Custom Secret PIN saved by the user in Settings.
+ * 3. If the dialed number matches the PIN:
+ *    - Aborts the call (ResultData = null).
+ *    - Prevents the call from appearing in logs (abortBroadcast).
+ *    - Launches the HFS Security App.
  */
 public class StealthLaunchReceiver extends BroadcastReceiver {
 
-    private static final String TAG = "HFS_StealthLaunch";
+    private static final String TAG = "HFS_StealthTrigger";
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        // We listen for the New Outgoing Call action
+        // We only care about new outgoing calls
         String action = intent.getAction();
         
         if (action != null && action.equals(Intent.ACTION_NEW_OUTGOING_CALL)) {
             
-            // 1. Get the number the user just typed in the dialer
+            // 1. Retrieve the number that the user just dialed
             String dialedNumber = intent.getStringExtra(Intent.EXTRA_PHONE_NUMBER);
             
-            if (dialedNumber == null) return;
+            if (dialedNumber == null) {
+                return;
+            }
 
-            // 2. Access the database to get the user's CUSTOM PIN
+            // 2. Fetch the CUSTOM PIN set by the user from the Database Helper
             HFSDatabaseHelper db = HFSDatabaseHelper.getInstance(context);
-            String savedSecretPin = db.getMasterPin(); // This is the PIN from your Settings screen
+            String savedPin = db.getMasterPin(); 
 
-            // 3. Compare the dialed number with the saved PIN
-            // We strip any extra characters like * or # just in case the user adds them
+            // 3. Normalize both numbers for comparison
+            // This removes any non-digit characters like spaces, dashes, *, or #
             String cleanDialed = dialedNumber.replaceAll("[^\\d]", "");
-            String cleanSaved = savedSecretPin.replaceAll("[^\\d]", "");
+            String cleanSaved = savedPin.replaceAll("[^\\d]", "");
 
+            // 4. Verify match and ensure the PIN is not empty
             if (cleanDialed.equals(cleanSaved) && !cleanSaved.isEmpty()) {
                 
-                Log.i(TAG, "Stealth Trigger Detected: " + cleanDialed);
+                Log.i(TAG, "Custom Stealth PIN matched. Intercepting call...");
 
-                // 4. CANCEL THE CALL
-                // This prevents the phone from actually dialing the number and 
-                // prevents it from showing up in the call log.
+                /* 
+                 * 5. CANCEL THE CALL 
+                 * Setting result data to NULL tells Android to stop placing the call.
+                 * abortBroadcast() ensures other apps don't try to handle it.
+                 */
                 setResultData(null);
+                abortBroadcast();
 
-                // 5. LAUNCH THE HFS APP
+                // 6. LAUNCH THE HFS APPLICATION
                 Intent launchIntent = new Intent(context, SplashActivity.class);
                 
-                // FLAG_ACTIVITY_NEW_TASK: Required to start an activity from a receiver
-                // FLAG_ACTIVITY_CLEAR_TOP: Ensures a clean launch of the app
+                /*
+                 * FLAG_ACTIVITY_NEW_TASK: 
+                 * Required to launch an activity from outside an existing activity context.
+                 * 
+                 * FLAG_ACTIVITY_CLEAR_TOP:
+                 * Ensures that if the app is already open, it resets to the entry point.
+                 */
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 
                 try {
                     context.startActivity(launchIntent);
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to launch HFS from dialer: " + e.getMessage());
+                    Log.e(TAG, "Failed to launch HFS Activity: " + e.getMessage());
                 }
             }
         }
